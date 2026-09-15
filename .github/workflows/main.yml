@@ -1,0 +1,42 @@
+name: Build app
+
+on:
+  workflow_dispatch:        # adds a "Run workflow" button in the Actions tab
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: macos-latest   # Apple Silicon runner
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project MTMR.xcodeproj \
+            -scheme MTMR \
+            -configuration Release \
+            -derivedDataPath build \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            | xcpretty -c
+
+      - name: Check architectures
+        run: lipo -info build/Build/Products/Release/MTMR.app/Contents/MacOS/MTMR
+
+      - name: Zip app (ditto keeps framework symlinks + signatures intact)
+        run: |
+          cd build/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent MTMR.app "$GITHUB_WORKSPACE/MTMR.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MTMR
+          path: MTMR.zip
